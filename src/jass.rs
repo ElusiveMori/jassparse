@@ -2,8 +2,7 @@ mod ast;
 
 #[allow(clippy::all, dead_code, unused_mut)]
 pub mod syntax;
-
-mod lexer;
+pub mod lexer;
 
 #[cfg(test)]
 mod tests {

@@ -24,6 +24,7 @@ pub enum Expr {
     RealLiteral(f32),
     VarAccess(Ident),
     ArrayAccess(Ident, Box<Expr>),
+    CodeRef(Ident),
     Null,
     Call(Ident, Vec<Expr>),
     BinaryOp(Box<Expr>, BinaryOp, Box<Expr>),
