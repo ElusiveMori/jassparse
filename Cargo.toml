@@ -1,18 +1,5 @@
-[package]
-name = "wc3builder"
-version = "0.1.0"
-authors = ["Timofey Sokolov <insomnia.array@gmail.com>"]
-edition = "2018"
-build = "build.rs" # LALRPOP preprocessing
+[workspace]
 
-[dependencies]
-lalrpop-util = "0.16.2"
-regex = "0.2.0"
-codespan = "0.2.0"
-codespan-reporting = "0.2.0"
-termcolor = "1.0.4"
-byteorder = "1.2.7"
-
-# Add a build-time dependency on the lalrpop library:
-[build-dependencies]
-lalrpop = "0.16.2"
+members = [
+    "jass_parser"
+]

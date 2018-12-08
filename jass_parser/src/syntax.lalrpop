@@ -1,0 +1,285 @@
+use std::str::FromStr;
+use crate::ast::*;
+use crate::lexer::Lexeme;
+use crate::lexer::SpannedError;
+use codespan::ByteIndex;
+
+grammar<'input>(input: &'input str);
+
+extern {
+    type Location = ByteIndex;
+    type Error = SpannedError<'input>;
+
+    enum Lexeme<'input> {
+        "line comment" => Lexeme::LineComment(<&'input str>),
+        "block comment" => Lexeme::BlockComment(<&'input str>),
+
+        "integer literal" => Lexeme::IntegerLiteral(<u32>),
+        "real literal" => Lexeme::RealLiteral(<f32>),
+        "string literal" => Lexeme::StringLiteral(<&'input str>),
+        "boolean literal" => Lexeme::BooleanLiteral(<bool>),
+        "null" => Lexeme::NullLiteral,
+
+        "identifier" => Lexeme::Identifier(<&'input str>),
+
+        "if" => Lexeme::If,
+        "then" => Lexeme::Then,
+        "else" => Lexeme::Else,
+        "elseif" => Lexeme::ElseIf,
+        "endif" => Lexeme::EndIf,
+        "function" => Lexeme::Function,
+        "endfunction" => Lexeme::EndFunction,
+        "globals" => Lexeme::Globals,
+        "endglobals" => Lexeme::EndGlobals,
+        "loop" => Lexeme::Loop,
+        "endloop" => Lexeme::EndLoop,
+
+        "constant" => Lexeme::Constant,
+        "array" => Lexeme::Array,
+        "local" => Lexeme::Local,
+        "native" => Lexeme::Native,
+        "type" => Lexeme::Type,
+        "extends" => Lexeme::Extends,
+
+        "takes" => Lexeme::Takes,
+        "returns" => Lexeme::Returns,
+        "exitwhen" => Lexeme::ExitWhen,
+        "return" => Lexeme::Return,
+        "set" => Lexeme::Set,
+        "call" => Lexeme::Call,
+
+        "*" => Lexeme::Asterisk,
+        "/" => Lexeme::Slash,
+        "+" => Lexeme::Plus,
+        "-" => Lexeme::Minus,
+        ">" => Lexeme::GreaterThan,
+        "<" => Lexeme::LessThan,
+        "=" => Lexeme::Assignment,
+
+        ">=" => Lexeme::GreaterThanEqual,
+        "<=" => Lexeme::LessThanEqual,
+        "==" => Lexeme::Equal,
+        "!=" => Lexeme::NotEqual,
+
+        "[" => Lexeme::LBracket,
+        "]" => Lexeme::RBracket,
+        "(" => Lexeme::LParen,
+        ")" => Lexeme::RParen,
+        "," => Lexeme::Comma,
+
+        "and" => Lexeme::And,
+        "or" => Lexeme::Or,
+        "not" => Lexeme::Not,
+
+        "handle" => Lexeme::Handle,
+        "integer" => Lexeme::Int,
+        "boolean" => Lexeme::Bool,
+        "string" => Lexeme::Str,
+        "real" => Lexeme::Real,
+        "code" => Lexeme::Code,
+        "nothing" => Lexeme::Nothing,
+    }
+}
+
+// Utils
+
+SingleComma: () = "," => ();
+
+CommaSeparatedOrNone<Rule>: Vec<Rule> =
+    <rules: (<Rule> SingleComma)*> <last: Rule?> => {
+        let mut rules = rules;
+        rules.extend(last);
+        rules
+    };
+
+CommaSeparatedOrSingle<Rule>: Vec<Rule> =
+    <rules: (<Rule> SingleComma)*> <last: Rule> => {
+        let mut rules = rules;
+        rules.push(last);
+        rules
+    };
+
+// actual grammar
+
+Ident: &'input str = "identifier" => <>;
+
+AddSubOp: BinaryOperator = {
+    "+" => BinaryOperator::Plus,
+    "-" => BinaryOperator::Minus,
+};
+
+MulDivOp: BinaryOperator = {
+    "*" => BinaryOperator::Mul,
+    "/" => BinaryOperator::Div,
+};
+
+CompOp: BinaryOperator = {
+    ">" => BinaryOperator::GT,
+    ">=" => BinaryOperator::GE,
+    "<" => BinaryOperator::LT,
+    "<=" => BinaryOperator::LE,
+};
+
+EqOp: BinaryOperator = {
+    "==" => BinaryOperator::EQ,
+    "!=" => BinaryOperator::NE,
+}
+
+OrOp: BinaryOperator = "or" => BinaryOperator::Or;
+AndOp: BinaryOperator = "and" => BinaryOperator::And;
+
+UnaryOperator: UnaryOperator = {
+    "+" => UnaryOperator::Plus,
+    "-" => UnaryOperator::Minus,
+    "not" => UnaryOperator::Not,
+}
+
+Literal: Literal<'input> = {
+    "string literal" => Literal::Str(<>),
+    "integer literal" => Literal::Int(<>),
+    "real literal" => Literal::Real(<>),
+    "boolean literal" => Literal::Bool(<>),
+    "null" => Literal::Null
+}
+
+FunctionCall: FunctionCall<'input> = {
+    <ident: Ident> "(" <args: CommaSeparatedOrNone<Expr> > ")" => {
+        FunctionCall {ident, args}
+    }
+};
+
+VariableRef: VariableRef<'input> = 
+    <ident: Ident> => VariableRef {ident};
+
+ArrayRef: ArrayRef<'input> = 
+    <ident: Ident> "[" <index: Expr> "]" => ArrayRef {ident, index: Box::new(index)};
+
+CodeRef: CodeRef<'input> =
+    "function" <ident: Ident> => CodeRef {ident};
+
+UnaryOperation: UnaryOperation<'input> =
+    <operator: UnaryOperator> <arg: Term> => UnaryOperation {operator, arg: Box::new(arg)};
+
+ParenExpr: Expr<'input> =
+    "(" <Expr> ")" => <>;
+
+NativeType: NativeType = {
+    "integer" => NativeType::Int,
+    "real" => NativeType::Real,
+    "string" => NativeType::Str,
+    "boolean" => NativeType::Bool,
+    "handle" => NativeType::Handle,
+    "code" => NativeType::Code,
+};
+
+Type: Type<'input> = {
+    NativeType => Type::Native(<>),
+    Ident => Type::Defined(<>),
+};
+
+Term: Expr<'input> = {
+    ParenExpr => <>,
+    Literal => Expr::Literal(<>),
+    VariableRef => Expr::VarAccess(<>),
+    ArrayRef => Expr::ArrayAccess(<>),
+    CodeRef => Expr::CodeRef(<>),
+    FunctionCall => Expr::Call(<>),
+    UnaryOperation => Expr::UnaryOperation(<>)
+};
+
+BinOpTier<Op,NextTier>: Expr<'input> = {
+    <lhs: BinOpTier<Op,NextTier>> <operator: Op> <rhs: NextTier> => {
+        Expr::BinaryOperation(BinaryOperation {
+            lhs: Box::new(lhs), 
+            rhs: Box::new(rhs), 
+            operator
+        })
+    },
+    NextTier
+};
+
+T1Expr = BinOpTier<MulDivOp, Term>;
+T2Expr = BinOpTier<AddSubOp, T1Expr>;
+T3Expr = BinOpTier<CompOp, T2Expr>;
+T4Expr = BinOpTier<EqOp, T3Expr>;
+T5Expr = BinOpTier<AndOp, T4Expr>;
+T6Expr = BinOpTier<OrOp, T5Expr>;
+
+// T1Expr = BinOpTier<MulDivOp, Term>;
+// T2Expr = BinOpTier<AddSubOp, T1Expr>;
+// T3Expr = BinOpTier<CompOp, T2Expr>;
+// T4Expr = BinOpTier<EqOp, T3Expr>;
+// T5Expr = BinOpTier<AndOp, T4Expr>;
+// T6Expr = BinOpTier<OrOp, T5Expr>;
+Expr = T6Expr;
+
+TypeDefinition: TypeDefinition<'input> =
+    "type" <lhs: Type> "extends" <rhs: Type> => TypeDefinition {lhs, rhs};
+
+FunctionArg: FunctionArg<'input> =
+    <arg_type: Type> <arg_name: Ident> => FunctionArg {arg_type, arg_name};
+
+FunctionArgs: FunctionArgs<'input> = {
+    "nothing" => FunctionArgs::Nothing,
+    CommaSeparatedOrSingle<FunctionArg> => FunctionArgs::List(<>)
+};
+
+FunctionReturns: FunctionReturns<'input> = {
+    "nothing" => FunctionReturns::Nothing,
+    Type => FunctionReturns::Type(<>)
+};
+
+FunctionSignature: FunctionSignature<'input> =
+    <name: Ident> "takes" <args: FunctionArgs> "returns" <returns: FunctionReturns> => FunctionSignature {name, args, returns};
+
+VariableAssignment: Expr<'input> =
+    "=" <Expr> => <>;
+
+VariableDeclaration: VariableDeclaration<'input> =
+    <var_type: Type> <is_array: "array"?> <var_name: Ident> <var_assignment: VariableAssignment?> => 
+        VariableDeclaration {var_type, var_name, var_assignment, is_array: is_array.is_some()};
+
+GlobalDeclaration: GlobalDeclaration<'input> =
+    <is_constant: "constant"?> <inner: VariableDeclaration> => GlobalDeclaration {is_constant: is_constant.is_some(), inner};
+
+LocalDeclaration: LocalDeclaration<'input> =
+    "local" <inner: VariableDeclaration> => LocalDeclaration {inner};
+
+IfConditional: Conditional<'input> = "if" <condition: Expr> "then" <body: CodeBlock> => Conditional {condition, body};
+ElseIfConditional: Conditional<'input> = "elseif" <condition: Expr> "then" <body: CodeBlock> => Conditional {condition, body};
+ElseBlock: CodeBlock<'input> = "else" <CodeBlock> => <>;
+
+CodeStatement: CodeStatement<'input> = {
+    "set" <var: VariableRef> "=" <expr: Expr> => CodeStatement::VariableAssignment {var, expr},
+    "set" <array: ArrayRef> "=" <expr: Expr> => CodeStatement::ArrayAssignment {array, expr},
+    "call" <func_name: Ident> "(" <args: CommaSeparatedOrNone<Expr>> ")" => CodeStatement::FunctionCall {func_name, args},
+    "loop" <body: CodeBlock> "endloop" => CodeStatement::Loop {body},
+    <primary: IfConditional> <secondaries: ElseIfConditional*> <body_else: ElseBlock?> "endif" => {
+        let mut conditionals = Vec::new();
+        conditionals.push(primary);
+        conditionals.extend(secondaries);
+        CodeStatement::If {conditionals, body_else}
+    },
+    "return" <expr: Expr?> => CodeStatement::Return {expr},
+    "exitwhen" <expr: Expr> => CodeStatement::ExitWhen {expr},
+};
+
+CodeBlock: CodeBlock<'input> = CodeStatement* => CodeBlock {statements: <>};
+GlobalBlock: GlobalBlock<'input> = "globals" <GlobalDeclaration*> "endglobals" => GlobalBlock {declarations: <>};
+
+FunctionDefinition: FunctionDefinition<'input> =
+    <is_constant: "constant"?> "function" <signature: FunctionSignature> <locals: LocalDeclaration*> <body: CodeBlock> "endfunction" => 
+        FunctionDefinition {is_constant: is_constant.is_some(), signature, locals, body};
+
+NativeDefinition: NativeDefinition<'input> =
+    <is_constant: "constant"?> "native" <signature: FunctionSignature> =>
+        NativeDefinition {is_constant: is_constant.is_some(), signature};
+
+ProgramElement: ProgramElement<'input> = {
+    NativeDefinition => ProgramElement::NativeFunction(<>),
+    FunctionDefinition => ProgramElement::UserFunction(<>),
+    GlobalBlock => ProgramElement::Globals(<>),
+    TypeDefinition => ProgramElement::Type(<>),
+}
+
+pub Program: Program<'input> = ProgramElement* => Program {elements: <>};
