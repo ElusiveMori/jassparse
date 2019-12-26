@@ -1,6 +1,8 @@
 use std::str::FromStr;
 use crate::ast::*;
 use crate::lexer::Lexeme;
+use crate::lexer::spanned;
+use crate::lexer::Spanned;
 use crate::lexer::SpannedError;
 use codespan::ByteIndex;
 
@@ -99,9 +101,13 @@ CommaSeparatedOrSingle<Rule>: Vec<Rule> =
         rules
     };
 
+Sp<Rule>: Spanned<Rule, ByteIndex> =
+    <l: @L> <rule: Rule> <r: @R> =>
+        spanned(l, r, rule);
+
 // actual grammar
 
-Ident: &'input str = "identifier" => <>;
+Ident: Spanned<&'input str> = Sp<"identifier"> => <>;
 
 AddSubOp: BinaryOperator = {
     "+" => BinaryOperator::Plus,
@@ -134,12 +140,12 @@ UnaryOperator: UnaryOperator = {
     "not" => UnaryOperator::Not,
 }
 
-Literal: Literal<'input> = {
-    "string literal" => Literal::Str(<>),
-    "integer literal" => Literal::Int(<>),
-    "real literal" => Literal::Real(<>),
-    "boolean literal" => Literal::Bool(<>),
-    "null" => Literal::Null
+Literal: Spanned<Literal<'input>> = {
+    Sp<"string literal"> => Literal::Str(<>),
+    Sp<"integer literal"> => Literal::Int(<>),
+    Sp<"real literal"> => Literal::Real(<>),
+    Sp<"boolean literal"> => Literal::Bool(<>),
+    Sp<"null"> => Literal::Null
 }
 
 FunctionCall: FunctionCall<'input> = {

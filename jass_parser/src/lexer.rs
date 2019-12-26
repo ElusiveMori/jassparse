@@ -149,7 +149,7 @@ pub struct Spanned<T> {
     pub span: Span<ByteIndex>,
 }
 
-fn spanned<T>(start: Location, end: Location, value: T) -> Spanned<T> {
+pub fn spanned<T>(start: Location, end: Location, value: T) -> Spanned<T> {
     Spanned {
         inner: value,
         span: Span::new(start.absolute, end.absolute),

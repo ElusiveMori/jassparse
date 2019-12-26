@@ -1,7 +1,14 @@
 
 // AST
 
+use crate::lexer::Spanned;
+use crate::lexer::spanned;
+
+type Sp<T> = Spanned<T>;
+
 pub type Ident<'input> = &'input str;
+pub type SpannedIdent<'input> = Sp<Ident<'input>>;
+pub type SpannedExpr<'input> = Sp<Expr<'input>>;
 
 #[derive(PartialEq, Debug)]
 pub enum BinaryOperator {
@@ -29,37 +36,37 @@ pub enum UnaryOperator {
 
 #[derive(PartialEq, Debug)]
 pub struct VariableRef<'input> {
-    pub ident: Ident<'input>
+    pub ident: SpannedIdent<'input>
 }
 
 #[derive(PartialEq, Debug)]
 pub struct ArrayRef<'input> {
-    pub ident: Ident<'input>,
-    pub index: Box<Expr<'input>>,
+    pub ident: SpannedIdent<'input>,
+    pub index: Box<SpannedExpr<'input>>,
 }
 
 #[derive(PartialEq, Debug)]
 pub struct CodeRef<'input> {
-    pub ident: Ident<'input>
+    pub ident: SpannedIdent<'input>
 }
 
 #[derive(PartialEq, Debug)]
 pub struct FunctionCall<'input> {
-    pub ident: Ident<'input>,
-    pub args: Vec<Expr<'input>>
+    pub ident: SpannedIdent<'input>,
+    pub args: Vec<SpannedExpr<'input>>
 }
 
 #[derive(PartialEq, Debug)]
 pub struct BinaryOperation<'input> {
-    pub lhs: Box<Expr<'input>>,
-    pub rhs: Box<Expr<'input>>,
+    pub lhs: Box<SpannedExpr<'input>>,
+    pub rhs: Box<SpannedExpr<'input>>,
     pub operator: BinaryOperator,
 }
 
 #[derive(PartialEq, Debug)]
 pub struct UnaryOperation<'input> {
     pub operator: UnaryOperator,
-    pub arg: Box<Expr<'input>>,
+    pub arg: Box<SpannedExpr<'input>>,
 }
 
 #[derive(PartialEq, Debug)]
@@ -95,13 +102,13 @@ pub enum NativeType {
 #[derive(PartialEq, Debug)]
 pub enum Type<'input> {
     Native(NativeType),
-    Defined(Ident<'input>)
+    Defined(SpannedIdent<'input>)
 }
 
 #[derive(PartialEq, Debug)]
 pub struct FunctionArg<'input> {
-    pub arg_name: Ident<'input>,
-    pub arg_type: Type<'input>
+    pub arg_name: SpannedIdent<'input>,
+    pub arg_type: Sp<Type<'input>>
 }
 
 #[derive(PartialEq, Debug)]
@@ -118,7 +125,7 @@ pub enum FunctionReturns<'input> {
 
 #[derive(PartialEq, Debug)]
 pub struct FunctionSignature<'input> {
-    pub name: Ident<'input>,
+    pub name: SpannedIdent<'input>,
     pub args: FunctionArgs<'input>,
     pub returns: FunctionReturns<'input>
 }
@@ -126,9 +133,9 @@ pub struct FunctionSignature<'input> {
 #[derive(PartialEq, Debug)]
 pub struct VariableDeclaration<'input> {
     pub is_array: bool,
-    pub var_name: Ident<'input>,
+    pub var_name: SpannedIdent<'input>,
     pub var_type: Type<'input>,
-    pub var_assignment: Option<Expr<'input>>,
+    pub var_assignment: Option<SpannedExpr<'input>>,
 }
 
 #[derive(PartialEq, Debug)]
@@ -164,7 +171,7 @@ pub struct TypeDefinition<'input> {
 
 #[derive(PartialEq, Debug)]
 pub struct Conditional<'input> {
-    pub condition: Expr<'input>,
+    pub condition: SpannedExpr<'input>,
     pub body: CodeBlock<'input>
 }
 
@@ -172,15 +179,15 @@ pub struct Conditional<'input> {
 pub enum CodeStatement<'input> {
     VariableAssignment {
         var: VariableRef<'input>,
-        expr: Expr<'input>
+        expr: SpannedExpr<'input>
     },
     ArrayAssignment {
         array: ArrayRef<'input>,
-        expr: Expr<'input>
+        expr: SpannedExpr<'input>
     },
     FunctionCall {
-        func_name: Ident<'input>,
-        args: Vec<Expr<'input>>
+        func_name: SpannedIdent<'input>,
+        args: Vec<SpannedExpr<'input>>
     },
     Loop {
         body: CodeBlock<'input>
@@ -190,16 +197,16 @@ pub enum CodeStatement<'input> {
         body_else: Option<CodeBlock<'input>>
     },
     Return {
-        expr: Option<Expr<'input>>
+        expr: Option<SpannedExpr<'input>>
     },
     ExitWhen {
-        expr: Expr<'input>
+        expr: SpannedExpr<'input>
     }
 }
 
 #[derive(PartialEq, Debug)]
 pub struct CodeBlock<'input> {
-    pub statements: Vec<CodeStatement<'input>>
+    pub statements: Vec<Sp<CodeStatement<'input>>>
 }
 
 #[derive(PartialEq, Debug)]
@@ -217,5 +224,5 @@ pub enum ProgramElement<'input> {
 
 #[derive(PartialEq, Debug)]
 pub struct Program<'input> {
-    pub elements: Vec<ProgramElement<'input>>
+    pub elements: Vec<Sp<ProgramElement<'input>>>
 }
