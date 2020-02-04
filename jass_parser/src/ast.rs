@@ -1,16 +1,11 @@
-
 // AST
 
-use crate::lexer::Spanned;
 use crate::lexer::spanned;
-
-type Sp<T> = Spanned<T>;
+use crate::lexer::Spanned;
 
 pub type Ident<'input> = &'input str;
-pub type SpannedIdent<'input> = Sp<Ident<'input>>;
-pub type SpannedExpr<'input> = Sp<Expr<'input>>;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum BinaryOperator {
     Plus,
     Minus,
@@ -24,61 +19,61 @@ pub enum BinaryOperator {
     LE,
     Not,
     And,
-    Or
+    Or,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum UnaryOperator {
     Not,
     Minus,
     Plus,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct VariableRef<'input> {
-    pub ident: SpannedIdent<'input>
+    pub ident: Ident<'input>,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct ArrayRef<'input> {
-    pub ident: SpannedIdent<'input>,
-    pub index: Box<SpannedExpr<'input>>,
+    pub ident: Ident<'input>,
+    pub index: Box<Expr<'input>>,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct CodeRef<'input> {
-    pub ident: SpannedIdent<'input>
+    pub ident: Ident<'input>,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct FunctionCall<'input> {
-    pub ident: SpannedIdent<'input>,
-    pub args: Vec<SpannedExpr<'input>>
+    pub ident: Ident<'input>,
+    pub args: Vec<Expr<'input>>,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct BinaryOperation<'input> {
-    pub lhs: Box<SpannedExpr<'input>>,
-    pub rhs: Box<SpannedExpr<'input>>,
+    pub lhs: Box<Expr<'input>>,
+    pub rhs: Box<Expr<'input>>,
     pub operator: BinaryOperator,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct UnaryOperation<'input> {
     pub operator: UnaryOperator,
-    pub arg: Box<SpannedExpr<'input>>,
+    pub arg: Box<Expr<'input>>,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum Literal<'input> {
     Str(&'input str),
     Int(u32),
     Real(f32),
     Bool(bool),
-    Null
+    Null,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum Expr<'input> {
     Literal(Literal<'input>),
     VarAccess(VariableRef<'input>),
@@ -86,10 +81,10 @@ pub enum Expr<'input> {
     CodeRef(CodeRef<'input>),
     Call(FunctionCall<'input>),
     BinaryOperation(BinaryOperation<'input>),
-    UnaryOperation(UnaryOperation<'input>)
+    UnaryOperation(UnaryOperation<'input>),
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum NativeType {
     Int,
     Real,
@@ -99,122 +94,122 @@ pub enum NativeType {
     Code,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum Type<'input> {
     Native(NativeType),
-    Defined(SpannedIdent<'input>)
+    Defined(Ident<'input>),
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct FunctionArg<'input> {
-    pub arg_name: SpannedIdent<'input>,
-    pub arg_type: Sp<Type<'input>>
+    pub arg_name: Ident<'input>,
+    pub arg_type: Type<'input>,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum FunctionArgs<'input> {
     Nothing,
     List(Vec<FunctionArg<'input>>),
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum FunctionReturns<'input> {
     Nothing,
-    Type(Type<'input>)
+    Type(Type<'input>),
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct FunctionSignature<'input> {
-    pub name: SpannedIdent<'input>,
+    pub name: Ident<'input>,
     pub args: FunctionArgs<'input>,
-    pub returns: FunctionReturns<'input>
+    pub returns: FunctionReturns<'input>,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct VariableDeclaration<'input> {
     pub is_array: bool,
-    pub var_name: SpannedIdent<'input>,
+    pub var_name: Ident<'input>,
     pub var_type: Type<'input>,
-    pub var_assignment: Option<SpannedExpr<'input>>,
+    pub var_assignment: Option<Expr<'input>>,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct LocalDeclaration<'input> {
-    pub inner: VariableDeclaration<'input>
+    pub inner: VariableDeclaration<'input>,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct GlobalDeclaration<'input> {
     pub is_constant: bool,
-    pub inner: VariableDeclaration<'input>
+    pub inner: VariableDeclaration<'input>,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct FunctionDefinition<'input> {
     pub is_constant: bool,
     pub signature: FunctionSignature<'input>,
     pub locals: Vec<LocalDeclaration<'input>>,
-    pub body: CodeBlock<'input>
+    pub body: CodeBlock<'input>,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct NativeDefinition<'input> {
     pub is_constant: bool,
-    pub signature: FunctionSignature<'input>
+    pub signature: FunctionSignature<'input>,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct TypeDefinition<'input> {
     pub lhs: Type<'input>,
-    pub rhs: Type<'input>
+    pub rhs: Type<'input>,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct Conditional<'input> {
-    pub condition: SpannedExpr<'input>,
-    pub body: CodeBlock<'input>
+    pub condition: Expr<'input>,
+    pub body: CodeBlock<'input>,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum CodeStatement<'input> {
     VariableAssignment {
         var: VariableRef<'input>,
-        expr: SpannedExpr<'input>
+        expr: Expr<'input>,
     },
     ArrayAssignment {
         array: ArrayRef<'input>,
-        expr: SpannedExpr<'input>
+        expr: Expr<'input>,
     },
     FunctionCall {
-        func_name: SpannedIdent<'input>,
-        args: Vec<SpannedExpr<'input>>
+        func_name: Ident<'input>,
+        args: Vec<Expr<'input>>,
     },
     Loop {
-        body: CodeBlock<'input>
+        body: CodeBlock<'input>,
     },
     If {
         conditionals: Vec<Conditional<'input>>,
-        body_else: Option<CodeBlock<'input>>
+        body_else: Option<CodeBlock<'input>>,
     },
     Return {
-        expr: Option<SpannedExpr<'input>>
+        expr: Option<Expr<'input>>,
     },
     ExitWhen {
-        expr: SpannedExpr<'input>
-    }
+        expr: Expr<'input>,
+    },
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct CodeBlock<'input> {
-    pub statements: Vec<Sp<CodeStatement<'input>>>
+    pub statements: Vec<CodeStatement<'input>>,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct GlobalBlock<'input> {
-    pub declarations: Vec<GlobalDeclaration<'input>>
+    pub declarations: Vec<GlobalDeclaration<'input>>,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum ProgramElement<'input> {
     NativeFunction(NativeDefinition<'input>),
     UserFunction(FunctionDefinition<'input>),
@@ -222,7 +217,7 @@ pub enum ProgramElement<'input> {
     Type(TypeDefinition<'input>),
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct Program<'input> {
-    pub elements: Vec<Sp<ProgramElement<'input>>>
+    pub elements: Vec<ProgramElement<'input>>,
 }

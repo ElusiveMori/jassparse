@@ -6,9 +6,9 @@ edition = "2018"
 build = "build.rs" # LALRPOP preprocessing
 
 [dependencies]
-lalrpop-util = "0.16.2"
-codespan = "0.2.0"
+lalrpop-util = "0.17.2"
+codespan = "0.6.0"
+byteorder = "*"
 
-# Add a build-time dependency on the lalrpop library:
 [build-dependencies]
-lalrpop = "0.16.2"
+lalrpop = "0.17.2"

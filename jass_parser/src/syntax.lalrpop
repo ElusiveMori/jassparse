@@ -4,12 +4,12 @@ use crate::lexer::Lexeme;
 use crate::lexer::spanned;
 use crate::lexer::Spanned;
 use crate::lexer::SpannedError;
-use codespan::ByteIndex;
+use crate::lexer::Location;
 
-grammar<'input>(input: &'input str);
+grammar<'input>();
 
 extern {
-    type Location = ByteIndex;
+    type Location = Location;
     type Error = SpannedError<'input>;
 
     enum Lexeme<'input> {
@@ -49,6 +49,7 @@ extern {
         "return" => Lexeme::Return,
         "set" => Lexeme::Set,
         "call" => Lexeme::Call,
+        "debug" => Lexeme::Debug,
 
         "*" => Lexeme::Asterisk,
         "/" => Lexeme::Slash,
@@ -101,13 +102,9 @@ CommaSeparatedOrSingle<Rule>: Vec<Rule> =
         rules
     };
 
-Sp<Rule>: Spanned<Rule, ByteIndex> =
-    <l: @L> <rule: Rule> <r: @R> =>
-        spanned(l, r, rule);
-
 // actual grammar
 
-Ident: Spanned<&'input str> = Sp<"identifier"> => <>;
+Ident: &'input str = "identifier" => <>;
 
 AddSubOp: BinaryOperator = {
     "+" => BinaryOperator::Plus,
@@ -140,12 +137,12 @@ UnaryOperator: UnaryOperator = {
     "not" => UnaryOperator::Not,
 }
 
-Literal: Spanned<Literal<'input>> = {
-    Sp<"string literal"> => Literal::Str(<>),
-    Sp<"integer literal"> => Literal::Int(<>),
-    Sp<"real literal"> => Literal::Real(<>),
-    Sp<"boolean literal"> => Literal::Bool(<>),
-    Sp<"null"> => Literal::Null
+Literal: Literal<'input> = {
+    "string literal" => Literal::Str(<>),
+    "integer literal" => Literal::Int(<>),
+    "real literal" => Literal::Real(<>),
+    "boolean literal" => Literal::Bool(<>),
+    "null" => Literal::Null
 }
 
 FunctionCall: FunctionCall<'input> = {
@@ -258,7 +255,7 @@ ElseBlock: CodeBlock<'input> = "else" <CodeBlock> => <>;
 CodeStatement: CodeStatement<'input> = {
     "set" <var: VariableRef> "=" <expr: Expr> => CodeStatement::VariableAssignment {var, expr},
     "set" <array: ArrayRef> "=" <expr: Expr> => CodeStatement::ArrayAssignment {array, expr},
-    "call" <func_name: Ident> "(" <args: CommaSeparatedOrNone<Expr>> ")" => CodeStatement::FunctionCall {func_name, args},
+    "debug"? "call" <func_name: Ident> "(" <args: CommaSeparatedOrNone<Expr>> ")" => CodeStatement::FunctionCall {func_name, args},
     "loop" <body: CodeBlock> "endloop" => CodeStatement::Loop {body},
     <primary: IfConditional> <secondaries: ElseIfConditional*> <body_else: ElseBlock?> "endif" => {
         let mut conditionals = Vec::new();

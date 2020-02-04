@@ -12,14 +12,8 @@ impl Location {
         Location { absolute: index }
     }
 
-    fn from_location(file_map: &FileMap, line: LineIndex, column: ColumnIndex) -> Location {
-        let index = file_map.byte_index(line, column).unwrap();
-
-        Location { absolute: index }
-    }
-
-    fn from_start<S: AsRef<str>>(file_map: &FileMap<S>) -> Location {
-        let index = file_map.span().start();
+    fn from_start(file_map: &Files, file_id: FileId) -> Location {
+        let index = file_map.source_span(file_id).start();
 
         Self::from_absolute(index)
     }
@@ -36,10 +30,10 @@ struct CharLocations<'input> {
 }
 
 impl<'input> CharLocations<'input> {
-    fn new<S: AsRef<str>>(input: &'input FileMap<S>) -> CharLocations<'input> {
+    fn new(input: &'input Files, file_id: FileId) -> CharLocations<'input> {
         CharLocations {
-            location: Location::from_start(input),
-            chars: input.src().chars(),
+            location: Location::from_start(input, file_id),
+            chars: input.source(file_id).chars(),
         }
     }
 }
@@ -97,6 +91,7 @@ pub enum Lexeme<'input> {
     Return,
     Set,
     Call,
+    Debug,
 
     // * / + - ! > < =
     Asterisk,
@@ -143,20 +138,14 @@ pub enum LexicalError<'input> {
     MalformedLiteral(&'input str),
 }
 
-#[derive(Clone, PartialEq, Debug)]
-pub struct Spanned<T> {
-    pub inner: T,
-    pub span: Span<ByteIndex>,
-}
+pub type Spanned<T> = (Location, T, Location);
 
 pub fn spanned<T>(start: Location, end: Location, value: T) -> Spanned<T> {
-    Spanned {
-        inner: value,
-        span: Span::new(start.absolute, end.absolute),
-    }
+    (start, value, end)
 }
 
 pub type SpannedLexeme<'input> = Spanned<Lexeme<'input>>;
+//pub type SpannedLexeme<'input> = (Location, Lexeme<'input>, Location);
 pub type SpannedError<'input> = Spanned<LexicalError<'input>>;
 
 fn is_ident_start(ch: char) -> bool {
@@ -208,16 +197,16 @@ pub struct Lexer<'input> {
 }
 
 impl<'input> Lexer<'input> {
-    pub fn new<S: AsRef<str>>(file_map: &'input FileMap<S>) -> Lexer<'input> {
-        let input = file_map.src();
-        let mut chars = CharLocations::new(file_map);
+    pub fn new(file_map: &'input Files, file_id: FileId) -> Lexer<'input> {
+        let input = file_map.source(file_id);
+        let mut chars = CharLocations::new(file_map, file_id);
         let lookahead = chars.next();
 
         Lexer {
             input,
             chars: chars,
             lookahead,
-            start_index: file_map.span().start(),
+            start_index: file_map.source_span(file_id).start(),
         }
     }
 
@@ -325,32 +314,26 @@ impl<'input> Lexer<'input> {
             ']' => Lexeme::RBracket,
             '(' => Lexeme::LParen,
             ')' => Lexeme::RParen,
-            '>' => {
-                match self.lookahead {
-                    Some((_, '=')) => {
-                        self.bump();
-                        Lexeme::GreaterThanEqual
-                    },
-                    _ => Lexeme::GreaterThan
+            '>' => match self.lookahead {
+                Some((_, '=')) => {
+                    self.bump();
+                    Lexeme::GreaterThanEqual
                 }
+                _ => Lexeme::GreaterThan,
             },
-            '<' => {
-                match self.lookahead {
-                    Some((_, '=')) => {
-                        self.bump();
-                        Lexeme::LessThanEqual
-                    },
-                    _ => Lexeme::LessThan
+            '<' => match self.lookahead {
+                Some((_, '=')) => {
+                    self.bump();
+                    Lexeme::LessThanEqual
                 }
+                _ => Lexeme::LessThan,
             },
-            '=' => {
-                match self.lookahead {
-                    Some((_, '=')) => {
-                        self.bump();
-                        Lexeme::Equal
-                    },
-                    _ => Lexeme::Assignment
+            '=' => match self.lookahead {
+                Some((_, '=')) => {
+                    self.bump();
+                    Lexeme::Equal
                 }
+                _ => Lexeme::Assignment,
             },
             ',' => Lexeme::Comma,
             '!' => match self.bump() {
@@ -413,11 +396,8 @@ impl<'input> Lexer<'input> {
         }
 
         let end = self.next_loc();
-        // let number: i32 = unsafe {
-        //     std::mem::transmute(u32::from_str_radix(self.slice(start, end), 16).unwrap())
-        // };
+
         let number = u32::from_str_radix(self.slice(start, end), 16).unwrap();
-        self.bump();
 
         Ok(spanned(start, end, Lexeme::IntegerLiteral(number)))
     }
@@ -559,6 +539,7 @@ impl<'input> Lexer<'input> {
             "exitwhen" => Lexeme::ExitWhen,
             "set" => Lexeme::Set,
             "call" => Lexeme::Call,
+            "debug" => Lexeme::Debug,
 
             "handle" => Lexeme::Handle,
             "integer" => Lexeme::Int,
@@ -600,9 +581,7 @@ impl<'input> Iterator for Lexer<'input> {
                 '\'' => return Some(self.char_number(index)),
                 '$' => return Some(self.hex_int(index)),
                 // ch if is_digit(ch) || (ch == '-' && self.test_lookahead(is_digit)) => {
-                ch if is_digit(ch) => {
-                    return Some(self.dec_number(index, ch))
-                }
+                ch if is_digit(ch) => return Some(self.dec_number(index, ch)),
                 ch if is_ident_start(ch) => return Some(Ok(self.identifier(index))),
                 ch if is_operator(ch) => return Some(self.operator(ch, index)),
                 ch if ch.is_whitespace() => continue,
@@ -624,12 +603,12 @@ impl<'input> Iterator for Lexer<'input> {
 mod tests {
     use crate::lexer::Lexeme;
     use crate::lexer::Lexer;
-    use codespan::FileMap;
-    use codespan::FileName;
+    use codespan::Files;
     #[test]
     fn test_lexer_simple_function() {
-        let file_map = FileMap::new(
-            FileName::virtual_("test_file.j"),
+        let mut file_map = Files::new();
+        let id = file_map.add(
+            "test_file.j",
             r#"
         function test_name takes integer a returns nothing
             call some_func(a)
@@ -638,7 +617,7 @@ mod tests {
         "#,
         );
 
-        let mut lexer = Lexer::new(&file_map).filter_map(|s| s.ok().map(|s| s.inner));
+        let mut lexer = Lexer::new(&file_map, id).filter_map(|s| s.ok());
 
         assert_eq!(lexer.next().unwrap(), Lexeme::Function);
         assert_eq!(lexer.next().unwrap(), Lexeme::Identifier("test_name"));
